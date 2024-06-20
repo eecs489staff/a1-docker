@@ -42,12 +42,22 @@ class AssignmentNetworks(Topo):
         self.addLink(s5, s6, bw=25, delay="5ms")
 
 
-if __name__ == "__main__":
-    setLogLevel("info")
+def run():
     topo = AssignmentNetworks()
     net = Mininet(
         topo=topo, link=TCLink, autoSetMacs=True, autoStaticArp=True, controller=None
     )
-    net.start()
-    CLI(net)
-    net.stop()
+    try:
+        net.start()
+        CLI(net)
+    except Exception as e:
+        print("Encountered an error: {}".format(e))
+    finally:
+        net.stop()
+    
+
+if __name__ == "__main__":
+    setLogLevel("info")
+    run()
+
+

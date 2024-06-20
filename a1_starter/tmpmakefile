@@ -15,11 +15,7 @@ define check_root
 	fi
 endef
 
-all:
-	$(check_root)
-	@$(MAKE) inner-all
-
-inner-all: $(PID_FILE) mininet controller install
+all: $(PID_FILE) mininet controller install
 
 mininet:
 	@xterm -fn fixed -e "/bin/bash -c '\
@@ -29,12 +25,10 @@ mininet:
 
 controller:
 	@xterm -fn fixed -e "/bin/bash -c '\
-		ONOS_APPS=gui,proxyarp,drivers.bmv2,lldpprovider,hostprovider \
-		$(SCRIPTS)/onos.sh; \
+		ONOS_APPS=gui,proxyarp,drivers.bmv2,lldpprovider,hostprovider $(SCRIPTS)/onos.sh; \
 		' \
 	" & echo $$! > .pids
 
-# FIXME: exit signal traps
 install: controller
 	@echo "Waiting for controller to be up..."
 	@while ! nc -z localhost 8181; do \
@@ -51,9 +45,8 @@ install: controller
 		printf "."; \
 		sleep 2; \
 	done
-	@echo ONOS serviced ready.
+	@echo "ONOS services ready."
 
-	# TODO: discover return code
 	@echo "Installing ONOS network configuration..."
 	$(SCRIPTS)/onos-netcfg cfg/netcfg.json
 
@@ -76,7 +69,6 @@ cli:
 		$(SCRIPTS)/onos-cli; \
 		' \
 	" & echo $$! >> .pids
-
 
 $(PID_FILE):
 	@touch $(PID_FILE)
