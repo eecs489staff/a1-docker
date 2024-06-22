@@ -3,6 +3,11 @@
 ONOS_CLI_DOCKER_NAME=${ONOS_CLI_DOCKER_NAME:-onos-cli}
 ONOS_CLI_IMG=${ONOS_CLI_IMG:-davidlor/python-ssh}
 
+stop_container() {
+  sudo docker stop $(sudo docker ps -q --filter ancestor=$ONOS_CLI_IMG)
+}
+trap 'stop_container;' EXIT
+
 docker run -it --rm \
   --name $ONOS_CLI_DOCKER_NAME \
   --network host \

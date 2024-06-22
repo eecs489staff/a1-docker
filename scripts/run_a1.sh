@@ -4,6 +4,7 @@ MN_STRATUM_MOUNT_DIR=${MN_STRATUM_MOUNT_DIR:-$PWD}
 
 stop_container() {
   sudo docker stop $(sudo docker ps -q --filter ancestor=$MN_STRATUM_489_IMG)
+  sudo mn -c
 }
 trap 'stop_container;' EXIT
 
