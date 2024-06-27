@@ -20,9 +20,6 @@ RUN apt-get update && \
     apt-get autoclean -y && \
     rm -rf /var/lib/apt/lists/*
 
-
-
-
 # Add alias for mn-stratum
 # RUN echo 'alias mn-stratum="mn --custom /root/stratum.py --switch stratum-bmv2 --controller none"' >> ~/.bashrc
 
@@ -32,8 +29,8 @@ RUN apt-get update && \
 # Copy bash script that runs everything
 # COPY run-mn-all.sh /root/assignment1/run-mn-all.sh
 
-# Copy script
-COPY src/* /root/assignment1/
+# Copy assignment 1 starter code
+COPY src/* /root/assignment1/ 
 
 # Override the entrypoint to prevent Mininet from starting automatically
 ENTRYPOINT [ "/bin/bash", "-l", "-c" ]

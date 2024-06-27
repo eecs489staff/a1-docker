@@ -2,8 +2,9 @@
 ############### Set up Mininet and Controller ######################
 ####################################################################
 
+NETCFG = ./cfg/netcfg_a1.json
 SCRIPTS = ../scripts
-PID_FILE = .pids
+PID_FILE = ./pids
 
 .PHONY: mininet controller activate-fwd netcfg install cli all clean
 
@@ -15,7 +16,11 @@ define check_root
 	fi
 endef
 
-all: $(PID_FILE) mininet controller install
+all:
+	$(check_root)
+	@$(MAKE) inner-all
+
+inner-all: $(PID_FILE) mininet controller install
 
 mininet:
 	@xterm -fn fixed -e "/bin/bash -c '\
@@ -25,10 +30,12 @@ mininet:
 
 controller:
 	@xterm -fn fixed -e "/bin/bash -c '\
-		ONOS_APPS=gui,proxyarp,drivers.bmv2,lldpprovider,hostprovider $(SCRIPTS)/onos.sh; \
+		ONOS_APPS=gui,proxyarp,drivers.bmv2,lldpprovider,hostprovider \
+		$(SCRIPTS)/onos.sh; \
 		' \
 	" & echo $$! > .pids
 
+# TODO: failure handling and exit signal traps
 install: controller
 	@echo "Waiting for controller to be up..."
 	@while ! nc -z localhost 8181; do \
@@ -37,18 +44,22 @@ install: controller
 	done
 	@echo "Controller up."
 
-	# Start ONOS CLI as a separate build item
-	$(MAKE) cli
-
+	# TODO: can poll specific services instead of cluster
 	@echo "Waiting for ONOS services to be ready..."
 	@while ! curl --user onos:rocks -s http://localhost:8181/onos/v1/cluster | grep -q '"status":"READY"'; do \
 		printf "."; \
 		sleep 2; \
 	done
-	@echo "ONOS services ready."
+	@echo ONOS services ready.
 
+
+	# Start ONOS CLI as a separate build item
+	$(MAKE) cli
+
+	# Install netcfg
 	@echo "Installing ONOS network configuration..."
-	$(SCRIPTS)/onos-netcfg cfg/netcfg.json
+	$(SCRIPTS)/onos-netcfg $(NETCFG)
+	
 
 	@echo "Distributing basic forwarding application to switches..."
 	@HTTP_CODE=$$(curl --user onos:rocks -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8181/onos/v1/applications/org.onosproject.fwd/active 2>/dev/null); \
@@ -62,13 +73,14 @@ activate-fwd:
 	curl --user onos:rocks -X POST http://localhost:8181/onos/v1/applications/org.onosproject.fwd/active
 
 netcfg:
-	$(SCRIPTS)/onos-netcfg cfg/netcfg.json
+	$(SCRIPTS)/onos-netcfg $(NETCFG)
 
 cli:
 	@xterm -fn fixed -e "/bin/bash -c '\
 		$(SCRIPTS)/onos-cli; \
 		' \
 	" & echo $$! >> .pids
+
 
 $(PID_FILE):
 	@touch $(PID_FILE)
