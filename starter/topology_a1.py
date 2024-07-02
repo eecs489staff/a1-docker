@@ -40,6 +40,11 @@ class AssignmentNetworks(Topo):
         self.addLink(s2, s4, bw=30, delay="30ms")
         self.addLink(s3, s5, bw=25, delay="5ms")
         self.addLink(s5, s6, bw=25, delay="5ms")
+        # self.addLink(s1, s2)
+        # self.addLink(s2, s3)
+        # self.addLink(s2, s4)
+        # self.addLink(s3, s5)
+        # self.addLink(s5, s6)
 
 
 def run():
@@ -47,6 +52,7 @@ def run():
     net = Mininet(
         topo=topo, link=TCLink, autoSetMacs=True, autoStaticArp=True, controller=None
     )
+    # net = Mininet(topo=topo, autoSetMacs=True, autoStaticArp=True, controller=None) # NO TCLink
     try:
         net.start()
         CLI(net)

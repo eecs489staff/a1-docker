@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ONOS_CLI_DOCKER_NAME=${ONOS_CLI_DOCKER_NAME:-onos-cli}
+ONOS_CLI_DOCKER_NAME=${ONOS_CLI_DOCKER_NAME:-eecs489-onos-cli}
 ONOS_CLI_IMG=${ONOS_CLI_IMG:-davidlor/python-ssh}
 
 stop_container() {

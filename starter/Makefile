@@ -16,83 +16,69 @@ define check_root
 	fi
 endef
 
-all:
-	$(check_root)
-	@$(MAKE) inner-all
-
-inner-all: $(PID_FILE) mininet controller install
-
 mininet:
-	@xterm -fn fixed -e "/bin/bash -c '\
-		$(SCRIPTS)/run_a1.sh; \
-		' \
-	" & echo $$! >> .pids
+	@echo "Starting Mininet..."
+	@$(SCRIPTS)/run_a1.sh
+	@echo "Mininet process completed."
 
 controller:
-	@xterm -fn fixed -e "/bin/bash -c '\
-		ONOS_APPS=gui,proxyarp,drivers.bmv2,lldpprovider,hostprovider \
-		$(SCRIPTS)/onos.sh; \
-		' \
-	" & echo $$! > .pids
+	@echo "Starting ONOS controller..."
+	@ONOS_APPS=gui,proxyarp,drivers.bmv2,lldpprovider,hostprovider $(SCRIPTS)/onos.sh
+	@echo "ONOS controller process completed."
 
-# TODO: failure handling and exit signal traps
-install: controller
-	@echo "Waiting for controller to be up..."
-	@while ! nc -z localhost 8181; do \
-		printf "."; \
-		sleep 2; \
-	done
-	@echo "Controller up."
-
-	# TODO: can poll specific services instead of cluster
-	@echo "Waiting for ONOS services to be ready..."
-	@while ! curl --user onos:rocks -s http://localhost:8181/onos/v1/cluster | grep -q '"status":"READY"'; do \
-		printf "."; \
-		sleep 2; \
-	done
-	@echo ONOS services ready.
-
-
-	# Start ONOS CLI as a separate build item
-	$(MAKE) cli
-
-	# Install netcfg
-	@echo "Installing ONOS network configuration..."
-	$(SCRIPTS)/onos-netcfg $(NETCFG)
-	
-
-	@echo "Distributing basic forwarding application to switches..."
-	@HTTP_CODE=$$(curl --user onos:rocks -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8181/onos/v1/applications/org.onosproject.fwd/active 2>/dev/null); \
-	if [ $$HTTP_CODE -eq 200 ]; then \
-		echo "Success: Basic forwarding application distributed."; \
-	else \
-		echo "Failure: Could not distribute basic forwarding application. HTTP status code: $$HTTP_CODE"; \
-	fi
 
 activate-fwd:
 	curl --user onos:rocks -X POST http://localhost:8181/onos/v1/applications/org.onosproject.fwd/active
 
 netcfg:
-	$(SCRIPTS)/onos-netcfg $(NETCFG)
+	$(SCRIPTS)/onos-netcfg.sh $(NETCFG)
 
 cli:
-	@xterm -fn fixed -e "/bin/bash -c '\
-		$(SCRIPTS)/onos-cli; \
-		' \
-	" & echo $$! >> .pids
+	@echo "Starting ONOS CLI (passwd: rocks)..."
+	@$(SCRIPTS)/onos-cli.sh
 
+# for tmux users
+tmux:
+	$(check_root)
+	@tmux new-session -d -s a1 -n onos "ONOS_APPS=gui,proxyarp,drivers.bmv2,lldpprovider,hostprovider $(SCRIPTS)/onos.sh; read"
+	@tmux new-window -t a1:1 -n mininet "$(SCRIPTS)/run_a1.sh; read"
+	@tmux new-window -t a1:2 -n bash
+
+	# @echo "Useful tmux commands:"
+	# @echo "  - In-session management:"
+	# @echo "      - Ctrl+b, n (next window)"
+	# @echo "      - Ctrl+b, p (previous window)"
+	# @echo "      - Ctrl+b, <number> (switch to a specific window)"
+	# @echo "      - Ctrl+b, c (create window)"
+	# @echo "      - Ctrl+b, & (delete window)"
+	# @echo "      - Ctrl+b, , (rename window)"
+	# @echo "      - Ctrl+b, d (detach session)"
+	# @echo "  - Session management:"
+	# @echo "      - (sudo) tmux ls"
+	# @echo "      - (sudo) tmux attach -t <name>"
+	# @echo "      - (sudo) tmux kill-session -t <name>"
+	# @echo ""
+	@echo "====  tmux session 'a1' started  ===="
+	@echo "To attach: \033[1msudo tmux attach -t a1\033[0m"
 
 $(PID_FILE):
 	@touch $(PID_FILE)
 
 clean:
 	$(check_root)
-	@if [ -f .pids ]; then \
-		while read -r pid; do \
-			kill $$pid || true; \
-		done < .pids; \
-		rm -f .pids; \
-		echo "Cleanup complete."; \
+	# Clean up Docker containers
+	@if sudo docker ps -a --filter "name=eecs489-" --format '{{.Names}}' | grep -q "eecs489-"; then \
+		sudo docker stop $$(docker ps -a --filter "name=eecs489-" --format '{{.Names}}'); \
+		sudo docker rm $$(docker ps -a --filter "name=eecs489-" --format '{{.Names}}'); \
+		echo "Docker container cleanup complete."; \
 	else \
-		echo ".pids file not found, nothing to clean."; \
+		echo "No Docker containers found to clean up."; \
+	fi
+
+	# Clean up a1 tmux sessions
+	@if tmux list-sessions 2>/dev/null | grep -q "a1"; then \
+		tmux kill-session -t a1; \
+		echo "tmux session cleanup complete."; \
+	else \
+		echo "No tmux session found to clean up."; \
 	fi
