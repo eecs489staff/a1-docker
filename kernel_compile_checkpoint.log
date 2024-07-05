@@ -1,0 +1,232 @@
+check_kernel_modules () 
+{ 
+    local modules_found=0;
+    if [ -d "/usr/src/linux-$KERNEL_VERSION" ]; then
+        if [ -f "/usr/src/linux-$KERNEL_VERSION/net/sched/sch_netem.ko" ]; then
+            echo "Netem module found in /usr/src/linux-$KERNEL_VERSION/net/sched/sch_netem.ko.";
+            ((modules_found++));
+        else
+            echo "Netem module not found in /usr/src/linux-$KERNEL_VERSION/net/sched/sch_netem.ko.";
+        fi;
+        if [ -f "/usr/src/linux-$KERNEL_VERSION/net/sched/sch_htb.ko" ]; then
+            echo "HTB module found in /usr/src/linux-$KERNEL_VERSION/net/sched/sch_htb.ko.";
+            ((modules_found++));
+        else
+            echo "HTB module not found in /usr/src/linux-$KERNEL_VERSION/net/sched/sch_htb.ko.";
+        fi;
+        if [ "$modules_found" -eq 2 ]; then
+            echo "Both Netem and HTB modules are compiled and available in the kernel source directory.";
+        else
+            echo "Not all required modules (Netem and HTB) are compiled and available in the kernel source directory.";
+        fi;
+    else
+        echo "Kernel source directory /usr/src/linux-$KERNEL_VERSION not found. Modules may not be compiled.";
+    fi
+}
+checkpoint () 
+{ 
+    if oneof "$1" "${already_run_functions[@]}"; then
+        return;
+    fi;
+    read -p "Do you want to proceed with $1? [(Y)/n]: " response;
+    if [[ "$response" =~ ^[Yy]$ ]] || [[ -z "$response" ]]; then
+        { 
+            declare -f;
+            declare -p $(compgen -v | grep -Ev '^(BASH.*|EUID|FUNCNAME|GROUPS|PPID|SHELLOPTS|UID|SHELL|SHLVL|USER|TERM|RANDOM|PIPESTATUS|LINENO|COLUMN|LC_.*|LANG)$')
+        } > "$LOG_FILE";
+        if ! "$@"; then
+            echo "Checkpoint: $1 failed";
+            exit 1;
+        fi;
+        already_run_functions+=("$1");
+    else
+        echo "Skipping $1.";
+    fi
+}
+clear_checkpoints () 
+{ 
+    if [[ -e "$LOG_FILE" ]]; then
+        rm "$LOG_FILE";
+        echo "Checkpoints cleared.";
+    else
+        echo "No checkpoints to clear.";
+    fi
+}
+compile_kernel () 
+{ 
+    cd "$KERNEL_DIR";
+    sudo make -j$(nproc);
+    sudo make modules_install;
+    sudo make install
+}
+configure_kernel () 
+{ 
+    cd "$KERNEL_DIR";
+    echo "Copying existing WSL2 config as base";
+    zcat /proc/config.gz > .config;
+    echo "Set debug info BTF off";
+    sed -i 's/CONFIG_DEBUG_INFO_BTF=y/# CONFIG_DEBUG_INFO_BTF is not set/' .config;
+    echo "Set CONFIG_NET_EMATCH_NETEM, CONFIG_NET_SCH_HTB to module (m) in $CONFIG_FILE.";
+    sed -i 's/# CONFIG_NET_SCH_HTB is not set/CONFIG_NET_SCH_HTB=m/' .config;
+    sed -i 's/# CONFIG_NET_EMATCH_NETEM is not set/CONFIG_NET_EMATCH_NETEM=m/' .config
+}
+download_kernel () 
+{ 
+    if [ ! -d "$KERNEL_DIR" ]; then
+        cd /usr/src;
+        sudo wget https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-$KERNEL_VERSION.tar.xz;
+        sudo tar -xf linux-$KERNEL_VERSION.tar.xz;
+    else
+        echo "Kernel directory $KERNEL_DIR already exists. Skipping download.";
+    fi
+}
+host_copy_kernel () 
+{ 
+    if [ -x "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ]; then
+        powershell_path="/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe";
+    else
+        if [ -x "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ]; then
+            powershell_path="/mnt/c/Windows/SysWOW64/WindowsPowerShell/v1.0/powershell.exe";
+        else
+            if [ -x "/mnt/c/Program Files/PowerShell/7/pwsh.exe" ]; then
+                powershell_path="/mnt/c/Program Files/PowerShell/7/pwsh.exe";
+            else
+                if [ -x "/mnt/c/Program Files/PowerShell/6/pwsh.exe" ]; then
+                    powershell_path="/mnt/c/Program Files/PowerShell/6/pwsh.exe";
+                else
+                    echo "PowerShell executable not found. Please install PowerShell on your Windows system.";
+                    exit 1;
+                fi;
+            fi;
+        fi;
+    fi;
+    local windows_user=$(sudo "$powershell_path" -Command '$env:USERNAME' | tr -d '\r');
+    local src_file="/usr/src/linux-$KERNEL_VERSION/arch/x86/boot/bzImage";
+    local dest_file="/mnt/c/Users/$windows_user/eecs489-linux-$KERNEL_VERSION";
+    local wslconfig_path="/mnt/c/Users/$windows_user/.wslconfig";
+    local backup_wslconfig_path="/mnt/c/Users/$windows_user/.wslconfigbackup";
+    if [ -f "$src_file" ]; then
+        echo "Copying kernel object to windows filesystem at $dest_file...";
+        cp "$src_file" "$dest_file";
+        echo "Copied.";
+    else
+        echo "Kernel source directory $src_file does not exist. Cannot copy.";
+        return 1;
+    fi;
+    if [ -f "$wslconfig_path" ]; then
+        mv "$wslconfig_path" "$backup_wslconfig_path";
+        echo "Existing .wslconfig file backed up to $backup_wslconfig_path.";
+    else
+        echo ".wslconfig file not found. No backup created.";
+    fi;
+    echo "[wsl2]" > "$wslconfig_path";
+    echo "kernel=C:\\\\Users\\\\$windows_user\\\\eecs489-linux-$KERNEL_VERSION" >> "$wslconfig_path";
+    echo "New .wslconfig file created with updated kernel path.";
+    echo "Contents of $wslconfig_path:";
+    echo "----------------------------------------";
+    cat "$wslconfig_path";
+    echo "----------------------------------------"
+}
+install_dependencies () 
+{ 
+    if [[ "$response" =~ ^[Yy]$ ]] || [[ -z "$response" ]]; then
+        sudo apt-get update && sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev;
+    fi
+}
+load_variables () 
+{ 
+    if [[ -e "$LOG_FILE" ]]; then
+        . "$LOG_FILE";
+    else
+        already_run_functions=();
+    fi
+}
+main () 
+{ 
+    read -p "Do you want to clear all checkpoints and start from scratch? [(Y)/n]: " clear_checkpoints_response;
+    if [[ "$clear_checkpoints_response" =~ ^[Yy]$ ]] || [[ -z "$clear_checkpoints_response" ]]; then
+        clear_checkpoints;
+    fi;
+    load_variables;
+    checkpoint install_dependencies;
+    checkpoint download_kernel;
+    checkpoint configure_kernel;
+    checkpoint compile_kernel;
+    host_copy_kernel;
+    if [ ${#already_run_functions[@]} -eq 4 ]; then
+        echo "Compiled and installed successfully: kernel $KERNEL_VERSION with modules: netem, htb.";
+        echo "Setup complete. Please restart WSL2 to reflect kernel changes.";
+        echo "* Open PowerShell as Administrator and run:";
+        echo "  PS C:\\Users\\youruser> wsl --shutdown";
+        echo "* Verify no WSL instances are running:";
+        echo "  PS C:\\Users\\youruser> wsl --list --running";
+        echo "  (This command should list nothing if no instances are running.)";
+        echo "* Start a new WSL instance:";
+        echo "  PS C:\\Users\\youruser> wsl";
+        echo "In your new WSL instance:";
+        echo "* Verify the new kernel version with:";
+        echo "  $ uname -r";
+        echo "* Load new modules with:";
+        echo "  $ sudo modprobe sch_netem";
+        echo "  $ sudo modprobe sch_htb";
+        echo "* List loaded modules:";
+        echo "  $ lsmod";
+        echo "  (Ensure sch_netem and sch_htb are listed.)";
+        echo "If the modules are loaded, your new kernel setup is ready to use with Mininet!";
+        echo "To revert to your old kernel at any time:";
+        echo "* Comment out config variable line in .wslconfig, or remove .wslconfig entirely.";
+        echo "* Modify config variable to point towards old kernel version of your liking.";
+        echo "* Repeat the steps above to apply the changes.";
+    else
+        echo "Failed to compile and install kernel $KERNEL_VERSION";
+        exit 1;
+    fi
+}
+oneof () 
+{ 
+    local item;
+    for item in "${@:2}";
+    do
+        if [[ "$1" == "$item" ]]; then
+            return 0;
+        fi;
+    done;
+    return 1
+}
+declare -x COLORTERM="truecolor"
+declare -- COMP_WORDBREAKS=" 	
+\"'@><=;|&(:"
+declare -- CONFIG_FILE=".config"
+declare -a DIRSTACK=([0]="/home/ahzhang/src/a1-docker")
+declare -x DISPLAY=":0"
+declare -- EPOCHREALTIME="1720207166.924264"
+declare -- EPOCHSECONDS="1720207166"
+declare -i HISTCMD="0"
+declare -x HOME="/root"
+declare -- HOSTNAME="AZ-Asus-Zenbook"
+declare -- HOSTTYPE="x86_64"
+declare -- IFS=" 	
+"
+declare -- KERNEL_DIR="/usr/src/linux-5.15.15"
+declare -- KERNEL_VERSION="5.15.15"
+declare -x LOGNAME="root"
+declare -- LOG_FILE="kernel_compile_checkpoint.log"
+declare -x LS_COLORS="rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:"
+declare -- MACHTYPE="x86_64-pc-linux-gnu"
+declare -x MAIL="/var/mail/root"
+declare -- OPTERR="1"
+declare -i OPTIND="1"
+declare -- OSTYPE="linux-gnu"
+declare -x PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
+declare -- PS4="+ "
+declare -x PWD="/home/ahzhang/src/a1-docker"
+declare -i SECONDS="4"
+declare -i SRANDOM="2858261190"
+declare -x SUDO_COMMAND="./compile_eecs489_kernel.sh"
+declare -x SUDO_GID="1000"
+declare -x SUDO_UID="1000"
+declare -x SUDO_USER="ahzhang"
+declare -- _="-f"
+declare -a already_run_functions=()
+declare -- clear_checkpoints_response="n"
+declare -- response=""

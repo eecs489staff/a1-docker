@@ -1,17 +1,62 @@
-# a1-docker
-## Dependencies
-* Docker runtime
-* Unix-based tooling
-  * `xterm` - terminal emulation (UI/UX). Depends on `X Server` GUI and user input server. 
-    - **WSL2**: X Server out of the box and configured, just use `apt`:
-      ```
-      sudo apt-get install xterm
-      ```
-    - **WSL1** - configure X Server on Windows: see [Appendix A](#appendix-a-installing-xterm-on-wsl1-with-x-server-vcxsrv)
-    - **MacOS** - requires `X Server`. Install using `xquartz`: see [Appendix B](#appendix-b-macos-xquartz-and-xterm-installation)
+# **Assignment 0**: Environment Setup + Virtual Network Stack (Mininet, Stratum, and ONOS) Usage
+## Overview
+In this assignment, you will learn how to set up a virtual environment, consisting of a network of hosts and switches, using open-source and production-ready tools (like [Mininet](http://mininet.org/) and [ONOS](https://opennetworking.org/onos/)). This will help give an introduction to the Docker containerization toolchain we will be using in the rest of our assignments, as well as serve as a primer to the Software-Defined-Networking (SDN) space for Assignment 4.
 
-## Basic Usage:
+Environment setup
+* [Part A](#part-a-install-docker): Docker Installation
+* [Part B](#Linux-Kernel-module-extensions): Linux Kernel module extensions **(WSL users)** 
 
+Virtual network
+* [Part C](#part-c-virtual-network-setup-and-basic-usage): Setup and Basic Usage
+
+
+## Learning Outcomes
+
+After completing this programming assignment, students should be able to:
+
+* Utilize Docker to retrieve and run software
+* Bootstrap a realistic virtual network, running over real kernel, switch and application code
+
+## Part A: Install Docker
+
+[Docker](https://www.docker.com/) is an open-source platform that lets us develop and deploy applications as a collection of fine-grain, OS-agnostic components called containers. These containers allow independently running components of the application to execute in any environment (e.g., Linux, Windows, or Mac) while sharing a single host kernel's resources. Containers differ from Virtual Machines (VMs), where each VM runs its own kernel while sharing a single hardware server. By using Docker, we are also able to distribute a single set of software, speeding up installation and reducing compatability issues.
+
+> **Linux/WSL Users:** *Docker Engine* is the underlying software layer that manages container runtimes and management. It is available for linux environments, and can be installed here: [https://docs.docker.com/engine/install/](https://docs.docker.com/engine/install/).
+
+> **Mac Users:** *Docker Desktop* is a GUI layer on top of *Docker Engine*, and is the only streamlined way to ship *Docker Engine* on Mac desktops. Once you run Desktop, *Docker Engine* will run under the hood, you are able to utilize the `docker` executable. Visit [https://docs.docker.com/get-docker/](https://docs.docker.com/get-docker/) to download and install the correct version of *Docker Desktop*. After that, run the post installation steps listed here: [https://docs.docker.com/engine/install/linux-postinstall/](https://docs.docker.com/engine/install/linux-postinstall/).
+
+* **Mac Intel-Chip Users:** On Intel-based Macs, Docker Desktop can run x86_64 Linux containers natively without any special configuration.
+
+* **Mac M1-M3 Apple Silicon Users:** 
+On Apple Silicon Macs with M1/M2/M3 chips, Docker Desktop uses translation layers to run x86_64 Linux containers: Rosetta 2 emulates x86_64 instructions from amd/x86_64 Docker linux binaries to be able to run natively on the Arm-based Apple Silicon. **Enable Rosetta 2 emulation in Docker Desktop > Settings > General > Use Rosetta**
+
+The nice thing about Docker is that you won't have to spend time installing the various tools and codebases we will use during the programming assignments. Installing these can, at times, become really tedious and time-consuming. Docker offloads all of that grunt work and lets you start using these tools from the get-go (as you will see in a bit)!
+
+## Part B: Linux Kernel module extensions
+> **MacOS users**: skip this section.
+
+In order for Mininet to emulate real kernel-level traffic control across its links and virtual switch processes, we need to enable modules that WSL does not expose out of the box.
+* `netem`: (also include man page or reference link) network emulation...
+* `htb`: (also include man page or reference link) heirarchical token bucket...
+
+Unfortunately, this means recompiling a new Linux kernel. Fortunately, this is not too bad, as we'll simply be compiling a copy of our linux kernel (or similar) with our new modules installed, for loading. Moreover, this is safe, and should not disrupt - we'll simply be compiling a similar copy of the linux kernel with our new modules installed
+
+We've provided scripts to make the process easier. Please feel free to inspect them.
+No breaking changes!
+### Step 1.
+
+### Step 2.
+### Step 3.
+
+
+## Part C: Virtual Network Setup and Basic Usage
+blahblah blah this is MININET and ONOS
+
+### Directory Tree
+Scripts blah blah 
+Makefile blah
+
+### Basic Usage:
 1. **Build and Install:**
    - Run `sudo make all`:
      - Sets up `mn-stratum` container environment.
@@ -44,90 +89,8 @@
 **Additional Information:**
 - Use `sudo docker ps` to inspect running containers at any time.
 
-## File System Management:
+### File System Management:
 TODO: explain how our docker scripts will mount the current working directory, and how this is a useful tool to be able to copy over source code. Explain what software dependencies the docker container exposes (stratum.py, etc) in order for our topology we give to execute
 
-## Testing on Mininet
+### Testing on Mininet
 TODO: explain how there are two methods, one using mininet CLI to execute compiled objects, the second being xterm. This will be useful for testing our assignment 1 code
-
-
-
-## Appendix A: Installing xterm on WSL1 with X Server (VcXsrv)
-
-### Step 1: Install an X Server on Windows
-
-1. **Download and Install VcXsrv**:
-   - Go to the [VcXsrv download page](https://sourceforge.net/projects/vcxsrv/).
-   - Download the installer and run it to install VcXsrv.
-   - During the installation, you can select the default options.
-
-2. **Configure VcXsrv**:
-   - After installation, start VcXsrv.
-   - Choose the "Multiple windows" option.
-   - Ensure "Start no client" is selected.
-   - Check "Disable access control" (for testing purposes; you might want to set up more secure access control for production use).
-   - Finish the configuration and start the server.
-
-### Step 2: Configure WSL1
-
-1. **Install xterm in WSL1**:
-   - Open your WSL1 terminal (e.g., Ubuntu for Windows).
-   - Update your package list and install xterm:
-     ```bash
-     sudo apt update
-     sudo apt install xterm
-     ```
-
-2. **Set the DISPLAY Environment Variable**:
-   - You need to set the `DISPLAY` environment variable to point to your Windows X server.
-   - Determine your Windows IP address in your local network by running the following in a Windows Command Prompt:
-     ```bash
-     ipconfig
-     ```
-   - Look for the IPv4 address in the output (e.g., `192.168.1.100`).
-   - In your WSL1 terminal, set the `DISPLAY` variable:
-     ```bash
-     export DISPLAY=192.168.1.100:0
-     ```
-     Replace `192.168.1.100` with your actual IP address.
-
-   - To make this setting persistent, you can add the export line to your `~/.bashrc` file:
-     ```bash
-     echo "export DISPLAY=192.168.1.100:0" >> ~/.bashrc
-     ```
-
-### Step 3: Run xterm
-
-1. **Start xterm**:
-   - With the X server running on Windows and the `DISPLAY` variable set in WSL1, you can now start xterm by running:
-     ```bash
-     xterm &
-     ```
-   - This should open an xterm window on your Windows desktop.
-
-### Additional Tips
-
-- **Troubleshooting**:
-  - Ensure your firewall allows connections to VcXsrv.
-  - Make sure VcXsrv is running when you try to launch xterm.
-  - If xterm doesn't start, check the `DISPLAY` variable and ensure it points to the correct IP address.
-
-- **Alternative X Servers**:
-  - You can also use other X servers like Xming, but the setup process is similar.
-
-## Appendix B: MacOS: XQuartz and xterm installation
-1. **Homebrew installation**:
-    ```bash
-    brew install --cask xquartz
-    brew install xterm
-    ```
-2. **Open XQuartz**:
-    ```bash
-    open -a XQuartz
-    ```
-3. **Set DISPLAY Variable and Launch xterm**:
-    ```bash
-    export DISPLAY=:0
-    xterm &
-    ```
-The xterm window should now appear on your screen, managed by XQuartz.
