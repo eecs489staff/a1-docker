@@ -1,0 +1,29 @@
+Manifest-Version: 1.0
+Bnd-LastModified: 1721089628158
+Build-Jdk: 11.0.23
+Built-By: ahzhang
+Bundle-Description: Reactive forwarding application using intent service
+  (experimental)
+Bundle-License: http://www.apache.org/licenses/LICENSE-2.0.txt
+Bundle-ManifestVersion: 2
+Bundle-Name: fwd489
+Bundle-SymbolicName: org.onosproject.fwd489
+Bundle-Version: 1.0.0
+Created-By: Apache Maven Bundle Plugin
+Export-Package: org.onosproject.fwd489;uses:="org.onosproject.cfg,org.on
+ osproject.core,org.onosproject.net.flow,org.onosproject.net.packet";ver
+ sion="1.0.0"
+Import-Package: org.onlab.packet;version="[2.7,3)",org.onosproject.cfg;v
+ ersion="[2.7,3)",org.onosproject.core;version="[2.7,3)",org.onosproject
+ .net;version="[2.7,3)",org.onosproject.net.flow;version="[2.7,3)",org.o
+ nosproject.net.packet;version="[2.7,3)",org.slf4j;version="[1.7,2)"
+Require-Capability: osgi.service;filter:="(objectClass=org.onosproject.c
+ fg.ComponentConfigService)";effective:=active,osgi.service;filter:="(ob
+ jectClass=org.onosproject.core.CoreService)";effective:=active,osgi.ser
+ vice;filter:="(objectClass=org.onosproject.net.flow.FlowRuleService)";e
+ ffective:=active,osgi.service;filter:="(objectClass=org.onosproject.net
+ .packet.PacketService)";effective:=active,osgi.extender;filter:="(&(osg
+ i.extender=osgi.component)(version>=1.4.0)(!(version>=2.0.0)))",osgi.ee
+ ;filter:="(&(osgi.ee=JavaSE)(version=11))"
+Service-Component: OSGI-INF/org.onosproject.fwd489.AppComponent.xml
+Tool: Bnd-4.1.0.201810181252

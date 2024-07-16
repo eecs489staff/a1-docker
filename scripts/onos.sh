@@ -1,7 +1,9 @@
 #!/bin/bash
 
 ONOS_DOCKER_NAME=${ONOS_DOCKER_NAME:-eecs489-onos}
-ONOS_IMG=${ONOS_IMG:-onosproject/onos:2.2.2}
+# ONOS_IMG=${ONOS_IMG:-onosproject/onos:2.5.9}
+# ONOS_IMG=${ONOS_IMG:-onosproject/onos:2.2.2}
+ONOS_IMG=${ONOS_IMG:-onosproject/onos:2.7.0}
 
 stop_container() {
   sudo docker stop $(sudo docker ps -q --filter ancestor=$ONOS_IMG)

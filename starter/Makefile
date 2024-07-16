@@ -6,7 +6,7 @@ NETCFG = ./cfg/netcfg_a1.json
 SCRIPTS = ../scripts
 PID_FILE = ./pids
 
-.PHONY: mininet controller activate-fwd netcfg install cli all clean
+.PHONY: mininet controller activate-fwd netcfg install cli install-fwd489 all clean
 
 # Check for root privileges
 define check_root
@@ -17,6 +17,14 @@ define check_root
 endef
 
 mininet:
+	@if ! lsmod | grep -q sch_netem; then \
+	    echo "Loading sch_netem module..."; \
+	    sudo modprobe sch_netem; \
+	fi
+	@if ! lsmod | grep -q sch_htb; then \
+	    echo "Loading sch_htb module..."; \
+	    sudo modprobe sch_htb; \
+	fi
 	@echo "Starting Mininet..."
 	@$(SCRIPTS)/run_a1.sh
 	@echo "Mininet process completed."
@@ -32,6 +40,17 @@ activate-fwd:
 
 netcfg:
 	$(SCRIPTS)/onos-netcfg.sh $(NETCFG)
+
+# OAR_FILE=onos-app-fwd489-1.9.0-SNAPSHOT.oar
+OAR_FILE=fwd489-1.0.0.oar
+ONOS_URL=http://localhost:8181/onos/v1
+APP_NAME=org.onosproject.fwd489
+
+install-fwd489:
+	# Uninstall the existing fwd489 app if it exists
+	curl --user onos:rocks -X DELETE ${ONOS_URL}/applications/${APP_NAME}
+	# Upload the OAR file
+	curl --user onos:rocks -X POST -H "Content-Type: application/octet-stream" --data-binary @${OAR_FILE} ${ONOS_URL}/applications
 
 cli:
 	@echo "Starting ONOS CLI (passwd: rocks)..."
